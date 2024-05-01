@@ -11,35 +11,66 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  RegisterBody,
-  RegisterBodyType,
-} from "@/schemaValidations/auth.schema";
+import { LoginBody, LoginBodyType } from "@/schemaValidations/auth.schema";
 import envConfig from "../../../../config";
+import { useToast } from "@/components/ui/use-toast";
 
-export default function RegisterForm() {
-  const form = useForm<RegisterBodyType>({
-    resolver: zodResolver(RegisterBody),
+export default function LoginForm() {
+  const { toast } = useToast();
+  const form = useForm<LoginBodyType>({
+    resolver: zodResolver(LoginBody),
     defaultValues: {
       email: "",
-      name: "",
       password: "",
-      confirmPassword: "",
     },
   });
 
-  async function onSubmit(values: RegisterBodyType) {
-    const result = await fetch(
-      `${envConfig.NEXT_PUBLIC_API_ENDPOINT}/auth/register`,
-      {
-        body: JSON.stringify(values),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        method: "POST",
+  async function onSubmit(values: LoginBodyType) {
+    try {
+      const result = await fetch(
+        `${envConfig.NEXT_PUBLIC_API_ENDPOINT}/auth/login`,
+        {
+          body: JSON.stringify(values),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        }
+      ).then(async (res) => {
+        const payload = await res.json();
+        const data = {
+          status: res.status,
+          payload,
+        };
+        if (!res.ok) {
+          throw data;
+        }
+        return data;
+      });
+      toast({
+        description: result.payload.message,
+      });
+    } catch (error: any) {
+      const errors = error.payload.errors as {
+        field: string;
+        message: string;
+      }[];
+      const status = error.status as number;
+      if (status === 422) {
+        errors.forEach((error) => {
+          form.setError(error.field as "email" | "password", {
+            type: "server",
+            message: error.message,
+          });
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error Comming",
+          description: error.payload.message,
+        });
       }
-    ).then((res) => res.json());
-    console.log(result);
+    }
   }
 
   return (
@@ -49,19 +80,6 @@ export default function RegisterForm() {
         className="space-y-2 max-w-[800px] w-full flex-shrink-0"
         noValidate
       >
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Name</FormLabel>
-              <FormControl>
-                <Input placeholder="Input your name" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
         <FormField
           control={form.control}
           name="email"
@@ -92,25 +110,8 @@ export default function RegisterForm() {
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="confirmPassword"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Confirm Password</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="Input your confirm password"
-                  type="password"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
         <Button className="!mt-8 w-full" type="submit">
-          Register
+          Login
         </Button>
       </form>
     </Form>
